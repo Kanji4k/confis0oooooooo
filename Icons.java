@@ -1,6 +1,8 @@
 package client.confis;
 
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.util.Identifier;
 
 /**
  * Module icons.
@@ -30,6 +32,36 @@ public final class Icons {
             case "gear" -> GEAR;
             default -> null;
         };
+    }
+
+    // ------------------------------------------------------------------ extracted sprite icons
+    /**
+     * Module icons that come from the reference sheet (tools/extract_icons.py). Each is a 32x32 PNG with a transparent
+     * background under assets/<mod>/textures/gui/sprites/module/ (<name>.png, <name>_off.png, <name>_hov.png).
+     * They are GUI sprites, so Minecraft stitches them into the GUI atlas once; drawing is one drawGuiTexture call.
+     * module id -> sprite name. A module that is not listed here (saturation) keeps its pre-baked icon below.
+     */
+    private static final String[][] SPRITE_MAP = {
+            {"fps", "compass"}, {"ping", "ping"}, {"tps", "tps"}, {"cps", "mouse"}, {"clock", "clock"},
+            {"day", "sun"}, {"armor", "armor"}, {"keystrokes", "wasd"}, {"waypoints", "waypoint"},
+            {"effects", "potion_purple"}, {"scoreboard", "scoreboard"}, {"reach", "crosshair"},
+            {"range", "crosshair"}, {"inventory", "inventory"}, {"totems", "totem"},
+            {"potions", "potion_green"}, {"zoom", "magnifier"}, {"freecam", "camera"},
+            {"fullbright", "bulb"}, {"noblind", "eye_slash"}, {"tiers", "trophy"}, {"shulker", "shulker"},
+            {"crosshair", "brackets"}, {"nodarkness", "moon"}, {"glint", "sparkle"},
+    };
+    /** sprite[state] per module id, built once. */
+    private static final java.util.HashMap<String, Identifier[]> SPRITES = new java.util.HashMap<>();
+
+    static {
+        for (String[] m : SPRITE_MAP) {
+            String base = "module/" + m[1];
+            SPRITES.put(m[0], new Identifier[] {
+                    Identifier.of(ConfisClient.MOD_ID, base),             // NORMAL
+                    Identifier.of(ConfisClient.MOD_ID, base + "_off"),    // DISABLED
+                    Identifier.of(ConfisClient.MOD_ID, base + "_hov"),    // HOVER
+            });
+        }
     }
 
     // ------------------------------------------------------------------ pre-baked colored icons
@@ -116,13 +148,19 @@ public final class Icons {
 
     // ------------------------------------------------------------------ drawing
     /** True if this id has a colored module icon. */
-    public static boolean has(String id) { return BAKED.containsKey(id); }
+    public static boolean has(String id) { return SPRITES.containsKey(id) || BAKED.containsKey(id); }
 
     /**
      * Shared icon renderer: draws the module icon with its top-left at (x, y); every icon pixel becomes a
      * scale x scale square. state = NORMAL / DISABLED / HOVER (picks a pre-baked palette, no per-frame math).
      */
     public static void drawIcon(DrawContext g, String id, int x, int y, int scale, int state) {
+        Identifier[] sp = SPRITES.get(id);
+        if (sp != null) {                                  // extracted PNG icon: one textured quad, pixel-exact at scale 2
+            int size = SIZE * scale;
+            g.drawGuiTexture(RenderPipelines.GUI_TEXTURED, sp[state], x, y, size, size);
+            return;
+        }
         Baked b = BAKED.get(id);
         if (b == null) return;
         int[] c = b.colors[state];
